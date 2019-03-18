@@ -38,6 +38,37 @@ MongoClient.connect(CONNECTION_URL, { useNewUrlParser: true }, (error, client) =
     res.send(resp);
   });
 
+  app.get('/movies/search', async function(req, res) {
+    if(req.query.metascore)
+      var meta = parseInt(req.query.metascore);
+    if(req.query.limit)
+      var lim = parseInt(req.query.limit);
+
+    if(meta && lim)
+      res.send(await collection.find({"metascore":{$gt:meta}}).limit(lim).sort({"metascore": -1 }).toArray());
+    else if(!meta && lim)
+      res.send(await collection.find({"metascore":{$gt:0}}).limit(lim).sort({"metascore": -1 }).toArray());
+    else if(meta && !lim)
+      res.send(await collection.find({"metascore":{$gt:meta}}).limit(5).sort({"metascore": -1 }).toArray());
+    else
+      res.send(await collection.find({"metascore":{$gt:0}}).limit(5).sort({"metascore": -1 }).toArray());
+  });
+
+  app.route('/movies/:id')
+    .get(async function(req, res) {
+      await collection.findOne({"id": req.params.id}, (error, result) => {
+          if(error) {
+              return res.status(500).send(error);
+          }
+          res.send(result);
+      });
+    })
+    .post(async function(req, res) {
+      if(req.query.review)
+        //var rev = parseInt(req.query.review);
+      if(req.query.date)
+        //var date = parseInt(req.query.date);
+    });
 
   app.use(function(req, res, next){
     res.setHeader('Content-Type', 'text/plain');
