@@ -65,9 +65,26 @@ MongoClient.connect(CONNECTION_URL, { useNewUrlParser: true }, (error, client) =
     })
     .post(async function(req, res) {
       if(req.query.review)
-        //var rev = parseInt(req.query.review);
+        var rev = req.query.review;
       if(req.query.date)
-        //var date = parseInt(req.query.date);
+        var date = req.query.date;
+
+      if(rev && date)
+      {
+        await collection.updateOne({"id" :req.params.id},{$set :{"review":rev}});
+        await collection.updateOne({"id" :req.params.id},{$set :{"date":date}});
+      }
+      else if(rev && !date)
+        await collection.updateOne({"id" :req.params.id},{$set :{"review":rev}});
+      else if(!rev && date)
+        await collection.updateOne({"id" :req.params.id},{$set :{"date":date}});
+
+      await collection.findOne({"id": req.params.id}, (error, result) => {
+          if(error) {
+              return res.status(500).send(error);
+          }
+          res.send(result);
+      });
     });
 
   app.use(function(req, res, next){
