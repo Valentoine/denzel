@@ -2,6 +2,9 @@ const Express = require("express");
 const BodyParser = require("body-parser");
 const MongoClient = require("mongodb").MongoClient;
 const ObjectId = require("mongodb").ObjectID;
+const Cors = require("cors");
+const ExpressGraphQL = require("express-graphql");
+const makeExecutableSchema = require("graphql-tools").makeExecutableSchema;
 require('dotenv').config();
 
 const imdb = require('./imdb.js');
@@ -9,10 +12,63 @@ const DENZEL_IMDB_ID = 'nm0000243';
 
 const CONNECTION_URL = "mongodb+srv://"+process.env.DB_USER+":"+process.env.DB_PASS+"@denzel-q6jaw.mongodb.net/test?retryWrites=true";
 const DATABASE_NAME = "Denzel";
+var database, collection;
+
+const typeDefs = `
+  type Movie {
+    id: String
+    link: String
+    metascore: Int
+    synopsis: String
+    title: String
+    year: Int
+    date : String
+    review : String
+  }
+
+  type Query {
+    movies: [Movie]
+    movie: Movie
+    movieid(id:String) : Movie
+  }
+
+  type Mutation {
+    createDateReview(id: String, date: String, review: String): Movie
+  }
+
+  schema {
+    query: Query
+    mutation: Mutation
+  }
+`;
+
+const resolvers = {
+  Query: {
+    movieid: async (root, {id}) => {
+      return (await collection.findOne({"id" :id}));
+    },
+    movies : async () => {
+      return (await collection.find({}).toArray());
+    },
+    movie : async () => {
+      return (await collection.findOne({"metascore":{$gt:70}}));
+    }
+  },
+  Mutation: {
+    createDateReview: async (root, {id, date, review}) => {
+      await collection.updateOne({"id" :id},{$set :{"review":review}});
+      await collection.updateOne({"id" :id},{$set :{"date":date}});
+      return (await collection.findOne({"id" :id}));
+    }
+  }
+};
+
+const schema = makeExecutableSchema({
+  typeDefs,
+  resolvers
+});
 
 var app = Express();
-
-var database, collection;
 
 MongoClient.connect(CONNECTION_URL, { useNewUrlParser: true }, (error, client) => {
 
@@ -21,7 +77,7 @@ MongoClient.connect(CONNECTION_URL, { useNewUrlParser: true }, (error, client) =
   database = client.db(DATABASE_NAME);
   collection = database.collection("Movies");
 
-  //Populate database
+  //API
   app.get('/movies/populate', async function(req, res) {
     const listMovies = await imdb(DENZEL_IMDB_ID);
 
@@ -86,6 +142,15 @@ MongoClient.connect(CONNECTION_URL, { useNewUrlParser: true }, (error, client) =
           res.send(result);
       });
     });
+
+
+  //graphql
+  app.use("/graphql",Cors(),BodyParser.json(),ExpressGraphQL({
+    schema,
+    graphiql: true
+    })
+  );
+
 
   app.use(function(req, res, next){
     res.setHeader('Content-Type', 'text/plain');
